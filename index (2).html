@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0F1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Consultas">
+<link rel="manifest" href="manifest.json">
+<title>Consultas — Gestão de Recibos</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0F1117;
+  --surface: #181B24;
+  --surface2: #1F2330;
+  --border: #2A2F3E;
+  --border2: #343B4F;
+  --text: #E8EAF0;
+  --muted: #6B7280;
+  --muted2: #9CA3AF;
+  --accent: #4F8EF7;
+  --accent-dim: rgba(79,142,247,0.12);
+  --green: #34D399;
+  --green-dim: rgba(52,211,153,0.12);
+  --red: #F87171;
+  --red-dim: rgba(248,113,113,0.12);
+  --yellow: #FBBF24;
+  --yellow-dim: rgba(251,191,36,0.1);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Geist', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+}
+
+/* ── SYNC BAR ── */
+#sync-bar {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+}
+
+.sync-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.sync-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.sync-dot.syncing { background: var(--yellow); animation: pulse 1s infinite; }
+.sync-dot.error { background: var(--red); }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.sync-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+/* ── HEADER ── */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo { display: flex; align-items: baseline; gap: 0.5rem; }
+.logo-title { font-family: 'Instrument Serif', serif; font-size: 1.4rem; color: var(--text); }
+.logo-sub { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.header-right { display: flex; align-items: center; gap: 0.75rem; }
+
+/* ── MONTH TABS ── */
+.month-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.month-bar::-webkit-scrollbar { display: none; }
+
+.month-tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.2s;
+  font-weight: 400;
+}
+.month-tab:hover { color: var(--text); }
+.month-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+.month-tab-add { padding: 0.75rem 1rem; font-size: 1rem; color: var(--muted); cursor: pointer; transition: color 0.2s; }
+.month-tab-add:hover { color: var(--accent); }
+
+/* ── LAYOUT ── */
+main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
+
+/* ── SUMMARY CARDS ── */
+.summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.stat-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.stat-value { font-family: 'Instrument Serif', serif; font-size: 1.6rem; line-height: 1; }
+.stat-value.green { color: var(--green); }
+.stat-value.yellow { color: var(--yellow); }
+.stat-value.red { color: var(--red); }
+.stat-value.accent { color: var(--accent); }
+.stat-sub { font-size: 0.75rem; color: var(--muted); }
+
+/* ── TOOLBAR ── */
+.toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+.toolbar-left { display: flex; gap: 0.5rem; flex: 1; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 0.5rem; }
+
+select, input[type="text"] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+select:focus, input[type="text"]:focus { border-color: var(--accent); }
+
+/* ── BUTTONS ── */
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex; align-items: center; gap: 0.4rem;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: #6B9FF9; }
+.btn-ghost { background: var(--surface2); color: var(--muted2); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+.btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid transparent; }
+.btn-danger:hover { border-color: var(--red); }
+.btn-green { background: var(--green-dim); color: var(--green); border: 1px solid transparent; }
+.btn-green:hover { border-color: var(--green); }
+.btn-sm { padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 6px; }
+
+/* ── TABLE ── */
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+thead tr { background: var(--surface2); border-bottom: 1px solid var(--border); }
+th { padding: 0.7rem 1rem; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; text-align: left; font-weight: 500; cursor: pointer; user-select: none; white-space: nowrap; }
+th:hover { color: var(--text); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; animation: rowIn 0.2s ease both; }
+@keyframes rowIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface2); }
+td { padding: 0.7rem 1rem; font-size: 0.85rem; color: var(--text); vertical-align: middle; }
+
+.clinic-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 20px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.type-badge { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 500; }
+.type-psiq { background: rgba(79,142,247,0.15); color: var(--accent); }
+.type-psico { background: rgba(167,139,250,0.15); color: #A78BFA; }
+.consult-badge { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 500; }
+.consult-1 { background: rgba(251,191,36,0.12); color: var(--yellow); }
+.consult-sub { background: rgba(107,114,128,0.15); color: var(--muted2); }
+.valor { font-weight: 500; font-variant-numeric: tabular-nums; }
+.pill { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 20px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+.pill-yes { background: var(--green-dim); color: var(--green); }
+.pill-no { background: var(--red-dim); color: var(--red); }
+.pill:hover { filter: brightness(1.2); }
+.td-actions { display: flex; gap: 0.4rem; }
+.empty-state { padding: 3rem; text-align: center; color: var(--muted); }
+.empty-state p { margin-top: 0.5rem; font-size: 0.85rem; }
+
+/* ── CLINIC CARDS ── */
+.clinic-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+.clinic-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; border-left: 3px solid; }
+.clinic-card-name { font-size: 0.78rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.clinic-card-stats { display: flex; gap: 1rem; }
+.clinic-stat { flex: 1; }
+.clinic-stat-val { font-family: 'Instrument Serif', serif; font-size: 1.2rem; }
+.clinic-stat-lbl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ── MODAL ── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; padding: 1.75rem; width: 100%; max-width: 500px; transform: translateY(16px); transition: transform 0.2s; max-height: 90vh; overflow-y: auto; }
+.overlay.open .modal { transform: translateY(0); }
+.modal-title { font-family: 'Instrument Serif', serif; font-size: 1.35rem; margin-bottom: 1.25rem; color: var(--text); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+.form-grid .full { grid-column: 1 / -1; }
+.form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+label { font-size: 0.72rem; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+.form-group input, .form-group select { width: 100%; padding: 0.6rem 0.75rem; font-size: 0.88rem; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+/* ── MONTH PICKER ── */
+.month-select-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 1rem 0; }
+.month-opt { padding: 0.5rem; text-align: center; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; font-size: 0.82rem; transition: all 0.15s; }
+.month-opt:hover { border-color: var(--accent); color: var(--accent); }
+.month-opt.taken { opacity: 0.3; pointer-events: none; }
+.year-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.year-btn { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; font-size: 0.9rem; transition: border-color 0.2s; }
+.year-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── ONEDRIVE MODAL ── */
+.onedrive-steps { display: flex; flex-direction: column; gap: 0.75rem; margin: 1rem 0; }
+.od-step { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); font-size: 0.85rem; }
+.od-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; flex-shrink: 0; }
+.od-step.done { border-color: var(--green); }
+.od-step.done .od-step-num { background: var(--green-dim); color: var(--green); }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+@media (max-width: 640px) {
+  header, main { padding-left: 1rem; padding-right: 1rem; }
+  .month-bar { padding: 0 1rem; }
+  #sync-bar { padding: 0.5rem 1rem; }
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid .full { grid-column: 1; }
+}
+</style>
+</head>
+<body>
+
+<!-- SYNC BAR -->
+<div id="sync-bar">
+  <div class="sync-status">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-text">A verificar ligação OneDrive...</span>
+  </div>
+  <div class="sync-actions">
+    <span id="sync-last" style="color:var(--muted);font-size:0.75rem"></span>
+    <button class="btn btn-ghost btn-sm" id="btn-sync-now" onclick="syncNow()" style="display:none">↻ Sincronizar</button>
+    <button class="btn btn-ghost btn-sm" onclick="openOneDriveModal()">☁ OneDrive</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <span class="logo-title">Consultas</span>
+    <span class="logo-sub">Gestão de Recibos</span>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-primary" onclick="openAddModal()">＋ Nova Consulta</button>
+  </div>
+</header>
+
+<div class="month-bar" id="month-bar"></div>
+
+<main>
+  <div class="summary-bar" id="summary-bar"></div>
+  <div class="clinic-summary" id="clinic-summary"></div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <select id="filter-clinic" onchange="renderTable()">
+        <option value="">Todas as clínicas</option>
+      </select>
+      <select id="filter-recibo" onchange="renderTable()">
+        <option value="">Recibo: todos</option>
+        <option value="SIM">Recibo emitido</option>
+        <option value="NÃO">Recibo pendente</option>
+      </select>
+      <select id="filter-pago" onchange="renderTable()">
+        <option value="">Pagamento: todos</option>
+        <option value="SIM">Pago</option>
+        <option value="NÃO">Por receber</option>
+      </select>
+    </div>
+    <div class="toolbar-right">
+      <button class="btn btn-ghost" onclick="printMonth()">🖨 Imprimir mês</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('data')">Data ↕</th>
+          <th onclick="sortBy('clinica')">Clínica ↕</th>
+          <th onclick="sortBy('nome')">Paciente ↕</th>
+          <th>Tipo</th>
+          <th>Consulta</th>
+          <th onclick="sortBy('valor')">Valor ↕</th>
+          <th>Recibo</th>
+          <th>Pago</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div class="empty-state" id="empty-state" style="display:none">
+      <span style="font-size:2rem">📋</span>
+      <p>Nenhuma consulta registada neste mês.</p>
+      <p style="margin-top:.5rem"><button class="btn btn-primary btn-sm" onclick="openAddModal()" style="margin:auto">＋ Adicionar consulta</button></p>
+    </div>
+  </div>
+</main>
+
+<!-- ADD/EDIT MODAL -->
+<div class="overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Nova Consulta</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Data</label>
+        <input type="date" id="f-data">
+      </div>
+      <div class="form-group">
+        <label>Clínica</label>
+        <select id="f-clinica" onchange="onClinicaChange()">
+          <option value="">— selecionar —</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Nome do Paciente</label>
+        <input type="text" id="f-nome" placeholder="Nome completo">
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="f-tipo" onchange="autoFillValor()">
+          <option value="Psiquiatria">Psiquiatria</option>
+          <option value="Psicoterapia">Psicoterapia</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Consulta</label>
+        <select id="f-ordem" onchange="autoFillValor()">
+          <option value="1ª">1ª Consulta</option>
+          <option value="Subsequente">Subsequente</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Valor (€)</label>
+        <input type="text" id="f-valor" placeholder="0,00">
+      </div>
+      <div class="form-group">
+        <label>Recibo emitido?</label>
+        <select id="f-recibo">
+          <option value="NÃO">NÃO</option>
+          <option value="SIM">SIM</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Pago?</label>
+        <select id="f-pago">
+          <option value="NÃO">NÃO</option>
+          <option value="SIM">SIM</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeOverlay()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveConsulta()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MONTH MODAL -->
+<div class="overlay" id="month-modal-overlay" onclick="closeMonthModal(event)">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-title">Adicionar mês</div>
+    <div class="year-row">
+      <button class="year-btn" onclick="changeYear(-1)">◀</button>
+      <span id="year-display" style="font-weight:500"></span>
+      <button class="year-btn" onclick="changeYear(1)">▶</button>
+    </div>
+    <div class="month-select-grid" id="month-grid"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('month-modal-overlay').classList.remove('open')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ONEDRIVE MODAL -->
+<div class="overlay" id="od-modal-overlay" onclick="closeOdModal(event)">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title">☁ OneDrive</div>
+    <div id="od-modal-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeOdModalDirect()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MSAL -->
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────
+const CLIENT_ID = 'e641fece-85fd-4215-a1b4-23d1ea21ec42';
+const REDIRECT_URI = 'https://joaopedroazenha.github.io/Registo-de-consultas/';
+const ONEDRIVE_FILE = 'consultas_backup.json';
+
+const msalConfig = {
+  auth: {
+    clientId: CLIENT_ID,
+    authority: 'https://login.microsoftonline.com/consumers',
+    redirectUri: REDIRECT_URI,
+  },
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+const SCOPES = ['Files.ReadWrite', 'User.Read'];
+
+// ── CLINICAS ──────────────────────────────────────────────────────
+const CLINICAS = {
+  'TRP':               { color: '#818CF8', valores: { Psiquiatria: { '1ª': 65, 'Subsequente': 58.5 }, Psicoterapia: { '1ª': 65, 'Subsequente': 58.5 } } },
+  'Autoestima':        { color: '#34D399', valores: { Psiquiatria: { '1ª': 70, 'Subsequente': 65 },  Psicoterapia: { '1ª': 70, 'Subsequente': 65 } } },
+  'ILCN':              { color: '#F472B6', valores: { Psiquiatria: { '1ª': 77, 'Subsequente': 65 },  Psicoterapia: { '1ª': 77, 'Subsequente': 65 } } },
+  'Machado Rodrigues': { color: '#FBBF24', valores: null },
+  'Orientações':       { color: '#38BDF8', valores: { Psiquiatria: { '1ª': 72, 'Subsequente': 64 },  Psicoterapia: { '1ª': 72, 'Subsequente': 64 } } },
+  'Individual':        { color: '#A78BFA', valores: { Psiquiatria: { '1ª': 90, 'Subsequente': 80 },  Psicoterapia: { '1ª': 90, 'Subsequente': 80 } } },
+};
+
+const MONTHS_PT   = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+// ── LOCAL STORAGE ─────────────────────────────────────────────────
+function storageKey(ym) { return 'consultas_' + ym; }
+function getMonths() { return JSON.parse(localStorage.getItem('consultas_months') || '[]'); }
+function setMonths(m) { localStorage.setItem('consultas_months', JSON.stringify(m)); }
+function getConsultas(ym) { return JSON.parse(localStorage.getItem(storageKey(ym)) || '[]'); }
+function setConsultas(ym, data) { localStorage.setItem(storageKey(ym), JSON.stringify(data)); }
+
+function getAllData() {
+  const months = getMonths();
+  const data = {};
+  months.forEach(m => { data[m] = getConsultas(m); });
+  return { months, data };
+}
+
+function loadAllData(payload) {
+  if (!payload || !payload.months || !payload.data) return;
+  setMonths(payload.months);
+  payload.months.forEach(m => { if (payload.data[m]) setConsultas(m, payload.data[m]); });
+}
+
+// ── STATE ─────────────────────────────────────────────────────────
+let activeMonth = null;
+let editingId = null;
+let sortCol = 'data';
+let sortAsc = true;
+let yearPicker = new Date().getFullYear();
+let odToken = null;
+let syncTimeout = null;
+
+// ── MSAL / ONEDRIVE ───────────────────────────────────────────────
+let msalReady = false;
+async function initMsal() {
+  try {
+    await msalInstance.initialize();
+    msalReady = true;
+    const result = await msalInstance.handleRedirectPromise();
+    if (result) { odToken = result.accessToken; }
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      setSyncStatus('syncing', 'A sincronizar...');
+      try {
+        odToken = await getToken();
+        await pullFromOneDrive();
+        setSyncStatus('connected', `Ligado como ${accounts[0].username}`);
+        document.getElementById('btn-sync-now').style.display = '';
+      } catch(e) {
+        setSyncStatus('error', 'Erro ao sincronizar — a usar dados locais');
+      }
+    } else {
+      setSyncStatus('disconnected', 'OneDrive não ligado');
+    }
+  } catch(e) {
+    setSyncStatus('disconnected', 'OneDrive não ligado');
+  }
+}
+
+async function getToken() {
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) throw new Error('Not logged in');
+  try {
+    const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+    return result.accessToken;
+  } catch(e) {
+    const result = await msalInstance.acquireTokenPopup({ scopes: SCOPES });
+    return result.accessToken;
+  }
+}
+
+async function loginOneDrive() {
+  try {
+    setSyncStatus('syncing', 'A aguardar login...');
+    const result = await msalInstance.loginPopup({ scopes: SCOPES });
+    odToken = result.accessToken;
+    setSyncStatus('syncing', 'A sincronizar...');
+    await pullFromOneDrive();
+    const accounts = msalInstance.getAllAccounts();
+    setSyncStatus('connected', `Ligado como ${accounts[0]?.username || 'conta Microsoft'}`);
+    document.getElementById('btn-sync-now').style.display = '';
+    renderOdModal();
+    renderAll();
+  } catch(e) {
+    setSyncStatus('error', 'Erro no login');
+  }
+}
+
+async function logoutOneDrive() {
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length) await msalInstance.logoutPopup({ account: accounts[0] });
+  odToken = null;
+  setSyncStatus('disconnected', 'OneDrive não ligado');
+  document.getElementById('btn-sync-now').style.display = 'none';
+  renderOdModal();
+}
+
+async function pullFromOneDrive() {
+  const token = odToken || await getToken();
+  const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${ONEDRIVE_FILE}:/content`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (res.status === 404) { await pushToOneDrive(); return; }
+  if (!res.ok) throw new Error('Pull failed');
+  const payload = await res.json();
+  loadAllData(payload);
+  localStorage.setItem('consultas_last_sync', new Date().toISOString());
+  updateLastSync();
+}
+
+async function pushToOneDrive() {
+  const token = odToken || await getToken();
+  const payload = JSON.stringify(getAllData());
+  const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${ONEDRIVE_FILE}:/content`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: payload
+  });
+  if (!res.ok) throw new Error('Push failed');
+  localStorage.setItem('consultas_last_sync', new Date().toISOString());
+  updateLastSync();
+}
+
+async function syncNow() {
+  if (!odToken) { try { odToken = await getToken(); } catch(e) { return; } }
+  setSyncStatus('syncing', 'A sincronizar...');
+  try {
+    await pushToOneDrive();
+    const accounts = msalInstance.getAllAccounts();
+    setSyncStatus('connected', `Ligado como ${accounts[0]?.username || 'conta Microsoft'}`);
+  } catch(e) {
+    setSyncStatus('error', 'Erro ao sincronizar');
+  }
+}
+
+function scheduleSyncAfterChange() {
+  if (!odToken) return;
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(async () => {
+    try { await pushToOneDrive(); } catch(e) {}
+  }, 3000); // sincroniza 3s após última alteração
+}
+
+function setSyncStatus(state, text) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-text');
+  dot.className = 'sync-dot ' + (state === 'connected' ? 'connected' : state === 'syncing' ? 'syncing' : state === 'error' ? 'error' : '');
+  txt.textContent = text;
+}
+
+function updateLastSync() {
+  const last = localStorage.getItem('consultas_last_sync');
+  if (!last) return;
+  const d = new Date(last);
+  document.getElementById('sync-last').textContent = `Última sync: ${d.toLocaleDateString('pt-PT')} ${d.toLocaleTimeString('pt-PT', {hour:'2-digit',minute:'2-digit'})}`;
+}
+
+// ── ONEDRIVE MODAL ────────────────────────────────────────────────
+function openOneDriveModal() {
+  const open = () => { renderOdModal(); document.getElementById('od-modal-overlay').classList.add('open'); };
+  if (!msalReady) { setTimeout(open, 1500); return; }
+  open();
+}
+function closeOdModal(e) { if (e.target === document.getElementById('od-modal-overlay')) closeOdModalDirect(); }
+function closeOdModalDirect() { document.getElementById('od-modal-overlay').classList.remove('open'); }
+
+function renderOdModal() {
+  const accounts = msalReady ? msalInstance.getAllAccounts() : [];
+  const isLoggedIn = accounts.length > 0;
+  const last = localStorage.getItem('consultas_last_sync');
+  const lastFmt = last ? new Date(last).toLocaleString('pt-PT') : 'nunca';
+
+  document.getElementById('od-modal-content').innerHTML = isLoggedIn ? `
+    <div class="onedrive-steps">
+      <div class="od-step done">
+        <div class="od-step-num">✓</div>
+        <div>
+          <div style="font-weight:500;color:var(--green)">Ligado ao OneDrive</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${accounts[0].username}</div>
+        </div>
+      </div>
+      <div class="od-step done">
+        <div class="od-step-num">✓</div>
+        <div>
+          <div style="font-weight:500">Ficheiro: <code style="font-size:0.8rem;color:var(--accent)">${ONEDRIVE_FILE}</code></div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">Na raiz do teu OneDrive</div>
+        </div>
+      </div>
+      <div class="od-step done">
+        <div class="od-step-num">✓</div>
+        <div>
+          <div style="font-weight:500">Última sincronização</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${lastFmt}</div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">Os dados sincronizam automaticamente 3 segundos após cada alteração.</p>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+      <button class="btn btn-green" onclick="syncNow();closeOdModalDirect()">↻ Sincronizar agora</button>
+      <button class="btn btn-danger" onclick="logoutOneDrive()">Desligar OneDrive</button>
+    </div>
+  ` : `
+    <p style="color:var(--muted);font-size:0.88rem;margin-bottom:1.25rem">Liga a tua conta Microsoft para guardar os dados no OneDrive e aceder em qualquer dispositivo.</p>
+    <div class="onedrive-steps">
+      <div class="od-step">
+        <div class="od-step-num">1</div>
+        <div>Clica em "Ligar ao OneDrive" abaixo</div>
+      </div>
+      <div class="od-step">
+        <div class="od-step-num">2</div>
+        <div>Faz login com a tua conta Microsoft pessoal</div>
+      </div>
+      <div class="od-step">
+        <div class="od-step-num">3</div>
+        <div>Os dados ficam guardados automaticamente</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:1rem" onclick="loginOneDrive()">
+      ☁ Ligar ao OneDrive
+    </button>
+  `;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+function init() {
+  const selAdd = document.getElementById('f-clinica');
+  const selFilter = document.getElementById('filter-clinic');
+  Object.keys(CLINICAS).forEach(c => {
+    selAdd.innerHTML += `<option value="${c}">${c}</option>`;
+    selFilter.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+
+  const now = new Date();
+  const curYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  let months = getMonths();
+  if (!months.includes(curYM)) { months.push(curYM); setMonths(months); }
+
+  updateLastSync();
+  renderMonthBar();
+  initMsal();
+}
+
+// ── MONTH BAR ─────────────────────────────────────────────────────
+function renderMonthBar() {
+  const bar = document.getElementById('month-bar');
+  const months = getMonths().sort();
+  if (!activeMonth || !months.includes(activeMonth)) activeMonth = months[months.length - 1];
+
+  bar.innerHTML = months.map(ym => {
+    const [y, m] = ym.split('-');
+    const label = MONTHS_PT[parseInt(m)-1] + y.slice(2);
+    return `<div class="month-tab${ym===activeMonth?' active':''}" onclick="switchMonth('${ym}')">${label}</div>`;
+  }).join('') + `<div class="month-tab-add" onclick="openMonthModal()" title="Adicionar mês">＋</div>`;
+
+  renderAll();
+}
+
+function switchMonth(ym) { activeMonth = ym; renderMonthBar(); }
+
+// ── RENDER ALL ────────────────────────────────────────────────────
+function renderAll() { renderSummary(); renderClinicCards(); renderTable(); }
+
+// ── SUMMARY ───────────────────────────────────────────────────────
+function renderSummary() {
+  const data = getConsultas(activeMonth);
+  const total = data.reduce((s,c) => s + parseFloat(c.valor||0), 0);
+  const pago  = data.filter(c=>c.pago==='SIM').reduce((s,c) => s + parseFloat(c.valor||0), 0);
+  const pend  = total - pago;
+  const semRecibo = data.filter(c=>c.recibo==='NÃO').length;
+  const [y, m] = activeMonth.split('-');
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Mês</div><div class="stat-value accent">${MONTHS_FULL[parseInt(m)-1]} ${y}</div><div class="stat-sub">${data.length} consulta${data.length!==1?'s':''}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Faturado</div><div class="stat-value accent">${fmt(total)}</div><div class="stat-sub">valor total do mês</div></div>
+    <div class="stat-card"><div class="stat-label">Recebido</div><div class="stat-value green">${fmt(pago)}</div><div class="stat-sub">${data.filter(c=>c.pago==='SIM').length} consultas pagas</div></div>
+    <div class="stat-card"><div class="stat-label">Por Receber</div><div class="stat-value ${pend>0?'yellow':'green'}">${fmt(pend)}</div><div class="stat-sub">${data.filter(c=>c.pago==='NÃO').length} consultas pendentes</div></div>
+    <div class="stat-card"><div class="stat-label">Recibos Pendentes</div><div class="stat-value ${semRecibo>0?'red':'green'}">${semRecibo}</div><div class="stat-sub">sem recibo emitido</div></div>
+  `;
+}
+
+// ── CLINIC CARDS ──────────────────────────────────────────────────
+function renderClinicCards() {
+  const data = getConsultas(activeMonth);
+  const div = document.getElementById('clinic-summary');
+  const byClinica = {};
+  data.forEach(c => {
+    if (!byClinica[c.clinica]) byClinica[c.clinica] = { n: 0, total: 0, pago: 0 };
+    byClinica[c.clinica].n++;
+    byClinica[c.clinica].total += parseFloat(c.valor||0);
+    if (c.pago === 'SIM') byClinica[c.clinica].pago += parseFloat(c.valor||0);
+  });
+  if (!Object.keys(byClinica).length) { div.innerHTML = ''; return; }
+  div.innerHTML = Object.entries(byClinica).map(([name, s]) => {
+    const color = CLINICAS[name]?.color || '#6B7280';
+    return `<div class="clinic-card" style="border-left-color:${color}">
+      <div class="clinic-card-name" style="color:${color}">${name}</div>
+      <div class="clinic-card-stats">
+        <div class="clinic-stat"><div class="clinic-stat-val">${s.n}</div><div class="clinic-stat-lbl">Consultas</div></div>
+        <div class="clinic-stat"><div class="clinic-stat-val">${fmt(s.total)}</div><div class="clinic-stat-lbl">Total</div></div>
+        <div class="clinic-stat"><div class="clinic-stat-val" style="color:${s.pago<s.total?'#FBBF24':'#34D399'}">${fmt(s.pago)}</div><div class="clinic-stat-lbl">Recebido</div></div>
+      </div></div>`;
+  }).join('');
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────
+function renderTable() {
+  let data = getConsultas(activeMonth);
+  const fC = document.getElementById('filter-clinic').value;
+  const fR = document.getElementById('filter-recibo').value;
+  const fP = document.getElementById('filter-pago').value;
+  if (fC) data = data.filter(c => c.clinica === fC);
+  if (fR) data = data.filter(c => c.recibo === fR);
+  if (fP) data = data.filter(c => c.pago === fP);
+  data = [...data].sort((a,b) => {
+    let va = a[sortCol]||'', vb = b[sortCol]||'';
+    if (sortCol === 'valor') { va = parseFloat(va||0); vb = parseFloat(vb||0); }
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+  const tbody = document.getElementById('table-body');
+  const empty = document.getElementById('empty-state');
+  if (!data.length) { tbody.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = data.map(c => {
+    const color = CLINICAS[c.clinica]?.color || '#6B7280';
+    const tipoClass = c.tipo === 'Psiquiatria' ? 'type-psiq' : 'type-psico';
+    const ordemClass = c.ordem === '1ª' ? 'consult-1' : 'consult-sub';
+    const dataFmt = c.data ? c.data.split('-').reverse().join('/') : '';
+    return `<tr>
+      <td>${dataFmt}</td>
+      <td><span class="clinic-badge"><span class="dot" style="background:${color}"></span>${c.clinica}</span></td>
+      <td>${c.nome}</td>
+      <td><span class="type-badge ${tipoClass}">${c.tipo}</span></td>
+      <td><span class="consult-badge ${ordemClass}">${c.ordem}</span></td>
+      <td class="valor">${fmt(parseFloat(c.valor||0))}</td>
+      <td><span class="pill ${c.recibo==='SIM'?'pill-yes':'pill-no'}" onclick="toggleField('${c.id}','recibo')">${c.recibo==='SIM'?'✓ SIM':'✗ NÃO'}</span></td>
+      <td><span class="pill ${c.pago==='SIM'?'pill-yes':'pill-no'}" onclick="toggleField('${c.id}','pago')">${c.pago==='SIM'?'✓ SIM':'✗ NÃO'}</span></td>
+      <td><div class="td-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editConsulta('${c.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteConsulta('${c.id}')">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = true; }
+  renderTable();
+}
+
+function toggleField(id, field) {
+  const data = getConsultas(activeMonth);
+  const c = data.find(x => x.id === id);
+  if (!c) return;
+  c[field] = c[field] === 'SIM' ? 'NÃO' : 'SIM';
+  setConsultas(activeMonth, data);
+  renderAll();
+  scheduleSyncAfterChange();
+}
+
+function deleteConsulta(id) {
+  if (!confirm('Eliminar esta consulta?')) return;
+  setConsultas(activeMonth, getConsultas(activeMonth).filter(c => c.id !== id));
+  renderAll();
+  scheduleSyncAfterChange();
+}
+
+// ── ADD/EDIT MODAL ────────────────────────────────────────────────
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Nova Consulta';
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-clinica').value = '';
+  document.getElementById('f-nome').value = '';
+  document.getElementById('f-tipo').value = 'Psiquiatria';
+  document.getElementById('f-ordem').value = 'Subsequente';
+  document.getElementById('f-valor').value = '';
+  document.getElementById('f-recibo').value = 'NÃO';
+  document.getElementById('f-pago').value = 'NÃO';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f-nome').focus(), 100);
+}
+
+function editConsulta(id) {
+  const c = getConsultas(activeMonth).find(x => x.id === id);
+  if (!c) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent = 'Editar Consulta';
+  document.getElementById('f-data').value = c.data;
+  document.getElementById('f-clinica').value = c.clinica;
+  document.getElementById('f-nome').value = c.nome;
+  document.getElementById('f-tipo').value = c.tipo;
+  document.getElementById('f-ordem').value = c.ordem;
+  document.getElementById('f-valor').value = String(c.valor).replace('.',',');
+  document.getElementById('f-recibo').value = c.recibo;
+  document.getElementById('f-pago').value = c.pago;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function onClinicaChange() { autoFillValor(); }
+
+function autoFillValor() {
+  const clinica = document.getElementById('f-clinica').value;
+  const tipo    = document.getElementById('f-tipo').value;
+  const ordem   = document.getElementById('f-ordem').value;
+  if (!clinica) return;
+  const cfg = CLINICAS[clinica];
+  if (!cfg || !cfg.valores) return;
+  const v = cfg.valores[tipo]?.[ordem];
+  if (v !== undefined) document.getElementById('f-valor').value = String(v).replace('.',',');
+}
+
+function saveConsulta() {
+  const data    = document.getElementById('f-data').value;
+  const clinica = document.getElementById('f-clinica').value;
+  const nome    = document.getElementById('f-nome').value.trim();
+  const tipo    = document.getElementById('f-tipo').value;
+  const ordem   = document.getElementById('f-ordem').value;
+  const valor   = parseFloat(document.getElementById('f-valor').value.replace(',','.')) || 0;
+  const recibo  = document.getElementById('f-recibo').value;
+  const pago    = document.getElementById('f-pago').value;
+  if (!data || !clinica || !nome) { alert('Preenche data, clínica e nome.'); return; }
+  let consultas = getConsultas(activeMonth);
+  if (editingId) {
+    const idx = consultas.findIndex(c => c.id === editingId);
+    if (idx >= 0) consultas[idx] = { ...consultas[idx], data, clinica, nome, tipo, ordem, valor, recibo, pago };
+  } else {
+    consultas.push({ id: Date.now().toString(), data, clinica, nome, tipo, ordem, valor, recibo, pago });
+  }
+  setConsultas(activeMonth, consultas);
+  closeOverlay();
+  renderAll();
+  scheduleSyncAfterChange();
+}
+
+function closeModal(e) { if (e.target === document.getElementById('modal-overlay')) closeOverlay(); }
+function closeOverlay() { document.getElementById('modal-overlay').classList.remove('open'); }
+
+// ── MONTH MODAL ───────────────────────────────────────────────────
+function openMonthModal() { yearPicker = new Date().getFullYear(); renderMonthPicker(); document.getElementById('month-modal-overlay').classList.add('open'); }
+function closeMonthModal(e) { if (e.target === document.getElementById('month-modal-overlay')) document.getElementById('month-modal-overlay').classList.remove('open'); }
+function changeYear(d) { yearPicker += d; renderMonthPicker(); }
+function renderMonthPicker() {
+  document.getElementById('year-display').textContent = yearPicker;
+  const taken = getMonths();
+  document.getElementById('month-grid').innerHTML = MONTHS_PT.map((m, i) => {
+    const ym = `${yearPicker}-${String(i+1).padStart(2,'0')}`;
+    return `<div class="month-opt${taken.includes(ym)?' taken':''}" onclick="addMonth('${ym}')">${m}</div>`;
+  }).join('');
+}
+function addMonth(ym) {
+  let months = getMonths();
+  if (!months.includes(ym)) { months.push(ym); setMonths(months); }
+  document.getElementById('month-modal-overlay').classList.remove('open');
+  activeMonth = ym;
+  renderMonthBar();
+}
+
+// ── PRINT ─────────────────────────────────────────────────────────
+function printMonth() {
+  const data = getConsultas(activeMonth).sort((a,b)=>a.data>b.data?1:-1);
+  const [y, m] = activeMonth.split('-');
+  const titulo = `${MONTHS_FULL[parseInt(m)-1]} ${y}`;
+  const total  = data.reduce((s,c)=>s+parseFloat(c.valor||0),0);
+  const rows = data.map(c => {
+    const d = c.data.split('-').reverse().join('/');
+    return `<tr><td>${d}</td><td>${c.clinica}</td><td>${c.nome}</td><td>${c.tipo}</td><td>${c.ordem}</td><td style="text-align:right">${fmt(parseFloat(c.valor||0))}</td><td>${c.recibo}</td><td>${c.pago}</td></tr>`;
+  }).join('');
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Consultas — ${titulo}</title>
+  <style>body{font-family:sans-serif;font-size:12px;color:#111;padding:2rem}h2{margin-bottom:1rem}table{width:100%;border-collapse:collapse}th,td{padding:6px 10px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5;font-weight:600}tfoot td{font-weight:700;background:#f0f0f0}</style>
+  </head><body><h2>Consultas — ${titulo}</h2>
+  <table><thead><tr><th>Data</th><th>Clínica</th><th>Paciente</th><th>Tipo</th><th>Consulta</th><th>Valor</th><th>Recibo</th><th>Pago</th></tr></thead>
+  <tbody>${rows}</tbody><tfoot><tr><td colspan="5">Total</td><td style="text-align:right">${fmt(total)}</td><td colspan="2"></td></tr></tfoot>
+  </table></body></html>`);
+  w.document.close(); w.print();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────
+function fmt(v) { return v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' }); }
+
+// ── START ─────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
